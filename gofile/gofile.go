@@ -59,7 +59,6 @@ func Start(dir string) {
 	prepareFiles(dir)
 	offset := GetOffset(offsetFileName(dir))
     fmt.Println(offset)
-
 }
 
 func prepareFiles(dir string) {
@@ -71,16 +70,12 @@ func prepareFiles(dir string) {
 
 func createDir(dir string) {
 	err := os.MkdirAll(dir, 0700)
-	if err != nil {
-		log.Fatal("Unable to use directory ", dir, err)
-	}
+	FatalCheck(err)
 	log.Println("Created directory", dir)
 
 	for _, filename := range []string{"index", "data"} {
 		file, err := os.Create(filename)
-		if err != nil {
-			log.Fatal(err)
-		}
+		FatalCheck(err)
 		file.Close()
 	}
 	SetOffset(offsetFileName(dir), 0)
@@ -89,25 +84,28 @@ func createDir(dir string) {
 func SetOffset(filename string, offset uint64) {
 	str := strconv.FormatUint(offset, 10)
 	err := ioutil.WriteFile(filename, []byte(str), 0600)
-	if err != nil {
-		log.Fatal(err)
-	}
+	FatalCheck(err)
+
     log.Println("Set Offset", offset)
 }
 
 func GetOffset(filename string) uint64 {
 	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		log.Fatal(err)
-	}
+    FatalCheck(err)
+
 	offset, err := strconv.ParseUint(string(data), 10, 64)
-	if err != nil {
-		log.Fatal(err)
-	}
+	FatalCheck(err)
+
 	log.Println("Get Offset", offset)
 	return offset
 }
 
 func offsetFileName(dir string) string {
 	return dir + string(os.PathSeparator) + "offset"
+}
+
+func FatalCheck(err error){
+    if err != nil {
+		log.Fatal(err)
+	}
 }
