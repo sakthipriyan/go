@@ -1,9 +1,10 @@
 package main
 
-
 import (
 	"github.com/sakthipriyan/go/queue"
+    "fmt"
 )
+
 /*
 func main() {
     gofile.Start("/tmp/gofile")
@@ -13,10 +14,10 @@ func main() {
 */
 
 func main() {
-    dir := "/tmp/goqueue"
+	dir := "/tmp/goqueue"
 	q := queue.Queue{}
 	q.Open(dir)
-	q.Write()
-	q.Read()
+	q.Write([]byte("Bytes hello!"))
+	fmt.Println(string(q.Read()))
 	q.Close()
 }

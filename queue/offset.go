@@ -1,9 +1,9 @@
 package queue
 
 import (
-    "io/ioutil"
-    "strconv"
-    "log"
+	"io/ioutil"
+	"log"
+	"strconv"
 )
 
 func WriteOffset(filepath string, offset uint64) {
