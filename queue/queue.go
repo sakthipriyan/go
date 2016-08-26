@@ -1,18 +1,18 @@
 package queue
 
 import (
+	"io"
 	"log"
 	"os"
 	"path/filepath"
-    "io"
 )
 
 type Queue struct {
-	baseDir    string
-	readOffset uint64
-    writeOffset uint64
-	indexFile  *os.File
-	dataFile   *os.File
+	baseDir     string
+	readOffset  uint64
+	writeOffset uint64
+	indexFile   *os.File
+	dataFile    *os.File
 }
 
 func (q *Queue) Open(dir string) error {
@@ -37,36 +37,36 @@ func (q *Queue) Open(dir string) error {
 func (q *Queue) Read() []byte {
 
 	log.Println("Reading the queue file")
-    _, err := q.dataFile.Seek(io.SeekStart, 0)
-    if err != nil {
+	_, err := q.dataFile.Seek(io.SeekStart, 0)
+	if err != nil {
 		log.Fatal(err)
 	}
 	buf := make([]byte, 24)
-	_  , err = q.dataFile.Read(buf)
+	_, err = q.dataFile.Read(buf)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Data read:", buf)
-    data := readHeader(buf)
-    log.Println("Data read:", *data)
+	data := readHeader(buf)
+	log.Println("Data read:", *data)
 
-    buf = make([]byte, data.size)
-    _  , err = q.dataFile.Read(buf)
-    if err != nil {
-        log.Fatal(err)
-    }
-    log.Println("Data read:", buf)
+	buf = make([]byte, data.size)
+	_, err = q.dataFile.Read(buf)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("Data read:", buf)
 
 	q.readOffset++
-    return buf
+	return buf
 }
 
 func (q *Queue) Write(data []byte) {
 	log.Println("Writing to queue", data)
-    data = binaryData(q.writeOffset, data)
-    log.Println("Writing to file", data)
-    _, err := q.dataFile.Seek(0, io.SeekStart)
-    if err != nil {
+	data = binaryData(q.writeOffset, data)
+	log.Println("Writing to file", data)
+	_, err := q.dataFile.Seek(0, io.SeekStart)
+	if err != nil {
 		log.Fatal(err)
 	}
 	_, err = q.dataFile.Write(data)

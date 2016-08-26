@@ -1,8 +1,8 @@
 package main
 
 import (
+	"fmt"
 	"github.com/sakthipriyan/go/queue"
-    "fmt"
 )
 
 /*
