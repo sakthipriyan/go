@@ -8,11 +8,11 @@ import (
 )
 
 type Queue struct {
-	baseDir     string
-	readOffset  uint64
-	writeOffset uint64
-	indexFile   *os.File
-	dataFile    *os.File
+	baseDir    string
+	offsetId   uint64
+	nextOffset uint64
+	indexFile  *os.File
+	dataFile   *os.File
 }
 
 func (q *Queue) Open(dir string) error {
@@ -22,9 +22,9 @@ func (q *Queue) Open(dir string) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		q.readOffset = 0
+		q.nextOffset = 0
 	} else {
-		q.readOffset = ReadOffset(filepath.Join(dir, "offset"))
+		q.nextOffset = ReadOffset(filepath.Join(dir, "offset"))
 	}
 	q.baseDir = dir
 	q.indexFile = openFile(dir, "index")
@@ -37,7 +37,7 @@ func (q *Queue) Open(dir string) error {
 func (q *Queue) Read() []byte {
 
 	log.Println("Reading the queue file")
-	_, err := q.dataFile.Seek(io.SeekStart, 0)
+	_, err := q.dataFile.Seek(int64(q.nextOffset), io.SeekStart)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -57,15 +57,16 @@ func (q *Queue) Read() []byte {
 	}
 	log.Println("Data read:", buf)
 
-	q.readOffset++
+	q.nextOffset += uint64(24) + uint64(data.size)
 	return buf
 }
 
 func (q *Queue) Write(data []byte) {
 	log.Println("Writing to queue", data)
-	data = binaryData(q.writeOffset, data)
+	data = binaryData(q.offsetId, data)
+	q.offsetId++
 	log.Println("Writing to file", data)
-	_, err := q.dataFile.Seek(0, io.SeekStart)
+	_, err := q.dataFile.Seek(0, io.SeekEnd)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,7 +80,7 @@ func (q *Queue) Close() {
 	q.indexFile.Close()
 	q.dataFile.Close()
 	offset := filepath.Join(q.baseDir, "offset")
-	WriteOffset(offset, q.readOffset)
+	WriteOffset(offset, q.nextOffset)
 }
 
 func openFile(baseDir string, filename string) *os.File {

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"github.com/sakthipriyan/go/queue"
 )
 
@@ -14,10 +14,17 @@ func main() {
 */
 
 func main() {
+	
+	/*
 	dir := "/tmp/goqueue"
 	q := queue.Queue{}
 	q.Open(dir)
 	q.Write([]byte("Bytes hello!"))
+	fmt.Println("sadfsd")
 	fmt.Println(string(q.Read()))
+	fmt.Println("sadfsdsd")
 	q.Close()
+	*/
+	go queue.Server()
+	queue.Client()
 }
