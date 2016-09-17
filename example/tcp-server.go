@@ -13,18 +13,13 @@ import (
 	"time"
 )
 
-var conns = struct {
-	sync.RWMutex
-	m map[int]net.Conn
-}{m: make(map[int]net.Conn)}
-
 func main() {
 
-	serverIP := flag.String("server", "127.0.0.1:8081", "ListenIP:Port")
+	serverIP := flag.String("listen", "127.0.0.1:8081", "host:port")
 	flag.Parse()
 
-	signalChan := make(chan os.Signal, 2)
 	doneChan := make(chan bool)
+	signalChan := make(chan os.Signal, 2)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 
 	fmt.Printf("Launching server at %s\n", *serverIP)
@@ -42,13 +37,14 @@ func main() {
 	}()
 
 	go func() {
+		conns := &Connections{m: make(map[int]net.Conn)}
 		for i := 0; ; i++ {
 			conn, err := ln.Accept()
 			if err != nil {
 				fmt.Println(err)
 				continue
 			}
-			go handleConnection(conn, i)
+			go handleConnection(conns, conn, i)
 		}
 	}()
 
@@ -56,35 +52,45 @@ func main() {
 
 }
 
-func handleConnection(conn net.Conn, id int) {
-
+func handleConnection(conns *Connections, conn net.Conn, id int) {
 	scanner := bufio.NewScanner(conn)
 	if !scanner.Scan() {
 		return
 	}
-
-	conns.Lock()
-	conns.m[id] = conn
-	conns.Unlock()
-
 	name := scanner.Text()
-	publish(id, name, "\b Joined")
-
+	conns.add(id, name, conn)
 	for {
 		if !scanner.Scan() {
-			conn.Close()
-			conns.Lock()
-			delete(conns.m, id)
-			conns.Unlock()
-			publish(id, name, "\b Left")
+			conns.remove(id, name)
 			return
 		}
 		text := scanner.Text()
-		publish(id, name, text)
+		conns.publish(id, name, text)
 	}
 }
 
-func publish(id int, name, text string) {
+type Connections struct {
+	sync.RWMutex
+	m map[int]net.Conn
+}
+
+func (conns *Connections) add(id int, name string, conn net.Conn) {
+	conns.Lock()
+	conns.m[id] = conn
+	conns.Unlock()
+	conns.publish(id, name, "\b Joined")
+	fmt.Println(conns.m)
+}
+
+func (conns *Connections) remove(id int, name string) {
+	conns.Lock()
+	conns.m[id].Close()
+	delete(conns.m, id)
+	conns.Unlock()
+	conns.publish(id, name, "\b Left")
+}
+
+func (conns *Connections) publish(id int, name, text string) {
 	ts := time.Now().Format(time.Kitchen)
 	fmt.Printf("[%s/%s]:%s \n", name, ts, text)
 	conns.RLock()

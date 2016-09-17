@@ -16,11 +16,12 @@ var doneChan = make(chan bool)
 
 func main() {
 
+	serverIP := flag.String("dial", "127.0.0.1:8081", "host:port")
+	flag.Parse()
+
 	signalChan := make(chan os.Signal, 2)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 
-	serverIP := flag.String("server", "127.0.0.1:8081", "ServerIP:Port")
-	flag.Parse()
 	fmt.Println("To exit type 'Ctrl + C'")
 
 	conn, err := net.DialTimeout("tcp", *serverIP, 3*time.Second)
@@ -42,6 +43,7 @@ func main() {
 func clientInput(conn net.Conn) {
 	fmt.Print("Enter Name:")
 	scanner := bufio.NewScanner(os.Stdin)
+
 	scanner.Scan()
 	name := scanner.Text()
 	fmt.Fprintf(conn, name+"\n")
@@ -57,10 +59,10 @@ func clientInput(conn net.Conn) {
 func serverOutput(name string, conn net.Conn) {
 	scanner := bufio.NewScanner(conn)
 	for {
-		if ok := scanner.Scan(); !ok {
+		if !scanner.Scan() {
 			fmt.Println("SERVER DISCONNECTED")
 			doneChan <- true
-			break
+			return
 		}
 		fmt.Println(scanner.Text())
 	}
