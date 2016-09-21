@@ -7,7 +7,19 @@ import (
 	"path/filepath"
 )
 
+type QueueRead struct {
+    Resp chan []byte
+}
+
+type QueueWrite struct {
+    Data  []byte
+    Resp chan bool
+}
+
 type Queue struct {
+	Read chan QueueRead
+	Write chan QueueWrite
+	Close chan chan bool
 	baseDir    string
 	offsetId   uint64
 	nextOffset uint64
@@ -15,12 +27,13 @@ type Queue struct {
 	dataFile   *os.File
 }
 
-func (q *Queue) Open(dir string) error {
+func NewQueue(dir string) (Queue, error) {
+	q := Queue{}
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
 		err := os.MkdirAll(dir, 0700)
 		if err != nil {
-			log.Fatal(err)
+			return q, err
 		}
 		q.nextOffset = 0
 	} else {
@@ -29,12 +42,15 @@ func (q *Queue) Open(dir string) error {
 	q.baseDir = dir
 	q.indexFile = openFile(dir, "index")
 	q.dataFile = openFile(dir, "data")
-
+	q.Read = make(chan QueueRead)
+	q.Write = make(chan QueueWrite)
+	q.Close = make(chan chan bool)
+	go q.run()
 	log.Println("Opening the queue file")
-	return nil
+	return q,nil
 }
 
-func (q *Queue) Read() []byte {
+func (q *Queue) read() []byte {
 
 	log.Println("Reading the queue file")
 	_, err := q.dataFile.Seek(int64(q.nextOffset), io.SeekStart)
@@ -61,7 +77,7 @@ func (q *Queue) Read() []byte {
 	return buf
 }
 
-func (q *Queue) Write(data []byte) {
+func (q *Queue) write(data []byte) {
 	log.Println("Writing to queue", data)
 	data = binaryData(q.offsetId, data)
 	q.offsetId++
@@ -76,11 +92,32 @@ func (q *Queue) Write(data []byte) {
 	}
 }
 
-func (q *Queue) Close() {
+func (q *Queue) close() {
 	q.indexFile.Close()
 	q.dataFile.Close()
+	//close(q.Read)
+	//close(q.Write)
+	//close(q.Close)
 	offset := filepath.Join(q.baseDir, "offset")
 	WriteOffset(offset, q.nextOffset)
+}
+
+func (q *Queue) run(){
+	for {
+		select {
+		case r := <- q.Read:
+			log.Println("Reading")
+			r.Resp <- q.read()
+		case w := <- q.Write:
+			log.Println("Writing")
+			q.write(w.Data)
+			w.Resp <- true
+		case c:= <- q.Close:
+			q.close()
+			c <- true
+			return
+		}
+	}
 }
 
 func openFile(baseDir string, filename string) *os.File {

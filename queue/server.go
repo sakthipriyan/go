@@ -1,49 +1,116 @@
 package queue
 
 import (
-	"bufio"
 	"fmt"
-	"net"
-	"os"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"regexp"
 	"strings"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
-func Server() {
+func Serve(listen, dir string) {
 
-	fmt.Println("Launching server...")
+	doneChan := make(chan bool)
+	signalChan := make(chan os.Signal, 2)
+	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 
-	// listen on all interfaces
-	ln, _ := net.Listen("tcp", ":8081")
+	reQueue := regexp.MustCompile(`^/[a-zA-Z0-9\-_]+$`)
+	reEnqueue := regexp.MustCompile(`^/[a-zA-Z0-9\-_]+/enqueue$`)
+	reDequeue := regexp.MustCompile(`^/[a-zA-Z0-9\-_]+/dequeue$`)
 
-	// accept connection on port
-	conn, _ := ln.Accept()
+	s := Service{newManager(dir)}
 
-	// run loop forever (or until ctrl-c)
-	for {
-		// will listen for message to process ending in newline (\n)
-		message, _ := bufio.NewReader(conn).ReadString('\n')
-		// output message received
-		fmt.Print("Message Received:", string(message))
-		// sample process for string received
-		newmessage := strings.ToUpper(message)
-		// send new string back to client
-		conn.Write([]byte(newmessage + "\n"))
+	handler := func (w http.ResponseWriter, r *http.Request) {
+		path := r.RequestURI
+		verb := r.Method
+		fmt.Println(verb, path)
+		switch {
+		case reEnqueue.MatchString(path) && verb == http.MethodPost:
+			s.enqueue(getName(path), w, r)
+		case reDequeue.MatchString(path) && verb == http.MethodPost:
+			s.dequeue(getName(path), w, r)
+		case reQueue.MatchString(path):
+			switch verb {
+			case http.MethodPost:
+				s.createQueue(path[1:], w)
+			case http.MethodDelete:
+				s.deleteQueue(path[1:], w)
+			case http.MethodGet:
+				s.getQueue(path[1:], w)
+			default:
+				http.NotFoundHandler()
+			}
+		case path == "/" && verb == http.MethodGet:
+			s.getStatus(w)
+		default:
+			http.NotFoundHandler()
+		}
 	}
+
+	go func() {
+		<-signalChan
+		fmt.Println("Stopping server ... ")
+		s.shutdown()
+		doneChan <- true
+	}()
+
+	http.HandleFunc("/", handler)
+
+	go func(){
+		log.Println("Listening on", listen)
+		err := http.ListenAndServe(listen, nil)
+		if err != nil {
+			log.Fatal("ListenAndServe:", err)
+		}
+	}()
+	<- doneChan
 }
 
-func Client() {
 
-	// connect to this socket
-	conn, _ := net.Dial("tcp", "127.0.0.1:8081")
-	for {
-		// read in input from stdin
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Text to send: ")
-		text, _ := reader.ReadString('\n')
-		// send to socket
-		fmt.Fprintf(conn, text+"\n")
-		// listen for reply
-		message, _ := bufio.NewReader(conn).ReadString('\n')
-		fmt.Print("Message from server: " + message)
+func getName(path string) string {
+	last := strings.LastIndex(path, "/")
+	return path[1:last]
+}
+
+type Service struct {
+	m *Manager
+}
+
+func (s *Service) getStatus(w http.ResponseWriter) {
+	w.Write([]byte("Get Status\n"))
+}
+
+func (s *Service) enqueue(q string, w http.ResponseWriter, r *http.Request) {
+	if data, err := ioutil.ReadAll(r.Body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	} else {
+		fmt.Println(string(data))
 	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Service) dequeue(q string, w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (s *Service) getQueue(q string, w http.ResponseWriter) {
+	w.Write([]byte("Get " + q + " \n"))
+}
+
+func (s *Service) createQueue(q string, w http.ResponseWriter) {
+	w.Write([]byte("Create " + q + " \n"))
+}
+
+func (s *Service) deleteQueue(q string, w http.ResponseWriter) {
+	w.Write([]byte("Delete " + q + " \n"))
+}
+
+func (s *Service) shutdown() {
+	s.m.Shutdown()
 }

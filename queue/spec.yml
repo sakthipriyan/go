@@ -1,0 +1,136 @@
+swagger: '2.0'
+info:
+  version: '1.0.0'
+  title: 'Go Queue'
+
+paths:
+
+  '/':
+    get:
+      summary: Get Queue Info
+      operationId: status
+      responses:
+        '200':
+          description: Queue system info
+          schema:
+            $ref: '#/definitions/Json'
+        '500':
+          description: Internal Server Error
+
+
+  '/{queue}':
+    get:
+      summary: Get Queue Info
+      operationId: getQueue
+      parameters:
+        - name: queue
+          in: path
+          description: Queue name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Queue info
+          schema:
+            $ref: '#/definitions/Json'
+        '404':
+          description: Invalid Queue
+        '500':
+          description: Internal Server Error
+
+    post:
+      summary: Create a Queue
+      operationId: createQueue
+      consumes:
+        - application/json
+      parameters:
+        - name: queue
+          in: path
+          description: Queue name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Queue created
+        '400':
+          description: Queue exists
+        '500':
+          description: Internal Server Error
+
+    delete:
+      summary: Create a Queue
+      operationId: deleteQueue
+      consumes:
+        - application/json
+      parameters:
+        - name: queue
+          in: path
+          description: Queue name
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Queue deleted
+        '404':
+          description: Queue is not present
+        '500':
+          description: Internal Server Error
+
+
+  '/{queue}/enqueue':
+    post:
+      summary: Enqueue an item into queue
+      operationId: enqueue
+      consumes:
+        - application/json
+      parameters:
+        - name: queue
+          in: path
+          description: Queue name
+          required: true
+          type: string
+        - in: body
+          name: json
+          description: Json data to be queued
+          required: true
+          schema:
+            $ref: '#/definitions/Json'
+      responses:
+        '200':
+          description: Json successfully queued
+        '400':
+          description: Non existing queue or invalid json
+        '500':
+          description: Internal Server Error
+
+  '/{queue}/dequeue':
+    post:
+      summary: Dequeue an item from queue
+      operationId: dequeue
+      consumes:
+        - application/json
+      parameters:
+        - name: queue
+          in: path
+          description: Queue name
+          required: true
+          type: string
+        - in: query
+          name: wait
+          description: Timeout for dequeue operation
+          required: false
+          type: string
+      responses:
+        '200':
+          description: Json successfully dequeued
+          schema:
+            $ref: '#/definitions/Json'
+        '404':
+          description: No Json in the queue
+        '500':
+          description: Internal Server Error
+
+
+definitions:
+  Json:
+    type: object
