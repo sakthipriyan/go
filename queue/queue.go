@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"fmt"
 )
 
 type QueueRead struct {
@@ -50,31 +51,26 @@ func NewQueue(dir string) (Queue, error) {
 	return q,nil
 }
 
-func (q *Queue) read() []byte {
+func (q *Queue) read() ([]byte, error) {
 
 	log.Println("Reading the queue file")
-	_, err := q.dataFile.Seek(int64(q.nextOffset), io.SeekStart)
-	if err != nil {
-		log.Fatal(err)
-	}
 	buf := make([]byte, 24)
-	_, err = q.dataFile.Read(buf)
+	_, err = q.dataFile.ReadAt(buf,int64(q.nextOffset))
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	log.Println("Data read:", buf)
 	data := readHeader(buf)
 	log.Println("Data read:", *data)
 
 	buf = make([]byte, data.size)
 	_, err = q.dataFile.Read(buf)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	log.Println("Data read:", buf)
 
 	q.nextOffset += uint64(24) + uint64(data.size)
-	return buf
+	return buf, nil
 }
 
 func (q *Queue) write(data []byte) {
@@ -95,9 +91,9 @@ func (q *Queue) write(data []byte) {
 func (q *Queue) close() {
 	q.indexFile.Close()
 	q.dataFile.Close()
-	//close(q.Read)
-	//close(q.Write)
-	//close(q.Close)
+	close(q.Read)
+	close(q.Write)
+	close(q.Close)
 	offset := filepath.Join(q.baseDir, "offset")
 	WriteOffset(offset, q.nextOffset)
 }
@@ -106,8 +102,13 @@ func (q *Queue) run(){
 	for {
 		select {
 		case r := <- q.Read:
-			log.Println("Reading")
-			r.Resp <- q.read()
+			data, err := q.read()
+			if err != nil {
+				fmt.Println(err)
+				r.Resp <- nil
+			} else {
+				r.Resp <- data
+			}
 		case w := <- q.Write:
 			log.Println("Writing")
 			q.write(w.Data)

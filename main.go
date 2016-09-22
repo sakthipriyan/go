@@ -14,14 +14,14 @@ func main() {
 	queue.Serve(*listen, *dir)
 	*/
 
-	q,_ := queue.NewQueue("/tmp/queue/test1/url")
+	q,_ := queue.NewQueue("/tmp/queue/test3/url")
 	wr := make(chan bool)
 	rr := make(chan []byte)
 	cr := make(chan bool)
 
 	done := make(chan bool,2)
 	go func(){
-		for i := 1; i <= 10000; i++ {
+		for i := 1; i <= 10; i++ {
 			q.Write <- queue.QueueWrite{[]byte("Bytes hello!"), wr}
 			fmt.Println(<- wr)
 		}
@@ -29,7 +29,7 @@ func main() {
 	}()
 
 	go func(){
-		for i := 1; i <= 100; i++ {
+		for i := 1; i <= 100000; i++ {
 			q.Read <- queue.QueueRead{rr}
 			fmt.Println(string(<- rr))
 		}
